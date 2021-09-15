@@ -16,6 +16,7 @@ Download splits and captions in this [***link***](https://www.kaggle.com/shtvkum
 ```shell
 python create_input_files.py
 python train.py
+python eval.py
 python caption.py --img='path/to/img.jpg' \
 --model='path/to/model.pth.tar' \
 --word_map='path/to/WORDMAP.json' --beam_size=5
