@@ -1,5 +1,5 @@
 ### Reference
-(1) Code : https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Image-Captioning
+(1) Code : https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Image-Captioning  
 (2) Paper : https://arxiv.org/abs/1502.03044
 
 ### Data setup
