@@ -9,6 +9,10 @@ class Encoder(nn.Module):
     """
     Encoder.
     """
+    """
+    Encoder encodes the input image with 3 color channels into a smaller image with "learned" channels.
+    ex. 14x14x2048
+    """
 
     def __init__(self, encoded_image_size=14):
         super(Encoder, self).__init__()
@@ -21,6 +25,7 @@ class Encoder(nn.Module):
         self.resnet = nn.Sequential(*modules)
 
         # Resize image to fixed size to allow input images of variable size
+        ## Different (pre-trained) NNs with different output sizes are allowed
         self.adaptive_pool = nn.AdaptiveAvgPool2d((encoded_image_size, encoded_image_size))
 
         self.fine_tune()
@@ -32,7 +37,7 @@ class Encoder(nn.Module):
         :param images: images, a tensor of dimensions (batch_size, 3, image_size, image_size)
         :return: encoded images
         """
-        out = self.resnet(images)  # (batch_size, 2048, image_size/32, image_size/32)
+        out = self.resnet(images)  ## (batch_size, 2048, image_size/32, image_size/32)
         out = self.adaptive_pool(out)  # (batch_size, 2048, encoded_image_size, encoded_image_size)
         out = out.permute(0, 2, 3, 1)  # (batch_size, encoded_image_size, encoded_image_size, 2048)
         return out
@@ -63,6 +68,7 @@ class Attention(nn.Module):
         :param attention_dim: size of the attention network
         """
         super(Attention, self).__init__()
+        ## Match the output dimensions of encoder and decoder(encoder_dim or decoder_dim -> attention_dim)
         self.encoder_att = nn.Linear(encoder_dim, attention_dim)  # linear layer to transform encoded image
         self.decoder_att = nn.Linear(decoder_dim, attention_dim)  # linear layer to transform decoder's output
         self.full_att = nn.Linear(attention_dim, 1)  # linear layer to calculate values to be softmax-ed
@@ -79,6 +85,7 @@ class Attention(nn.Module):
         """
         att1 = self.encoder_att(encoder_out)  # (batch_size, num_pixels, attention_dim)
         att2 = self.decoder_att(decoder_hidden)  # (batch_size, attention_dim)
+        ## Apply 'unsqueeze(1)' to use 'att' as input of softmax layer
         att = self.full_att(self.relu(att1 + att2.unsqueeze(1))).squeeze(2)  # (batch_size, num_pixels)
         alpha = self.softmax(att)  # (batch_size, num_pixels)
         attention_weighted_encoding = (encoder_out * alpha.unsqueeze(2)).sum(dim=1)  # (batch_size, encoder_dim)
@@ -174,7 +181,7 @@ class DecoderWithAttention(nn.Module):
 
         # Flatten image
         encoder_out = encoder_out.view(batch_size, -1, encoder_dim)  # (batch_size, num_pixels, encoder_dim)
-        num_pixels = encoder_out.size(1)
+        num_pixels = encoder_out.size(1) ## 14x14, not 256x256
 
         # Sort input data by decreasing lengths; why? apparent below
         caption_lengths, sort_ind = caption_lengths.squeeze(1).sort(dim=0, descending=True)
@@ -205,7 +212,7 @@ class DecoderWithAttention(nn.Module):
             gate = self.sigmoid(self.f_beta(h[:batch_size_t]))  # gating scalar, (batch_size_t, encoder_dim)
             attention_weighted_encoding = gate * attention_weighted_encoding
             h, c = self.decode_step(
-                torch.cat([embeddings[:batch_size_t, t, :], attention_weighted_encoding], dim=1),
+                torch.cat([embeddings[:batch_size_t, t, :], attention_weighted_encoding], dim=1), ## embed_dim + encoder_dim
                 (h[:batch_size_t], c[:batch_size_t]))  # (batch_size_t, decoder_dim)
             preds = self.fc(self.dropout(h))  # (batch_size_t, vocab_size)
             predictions[:batch_size_t, t, :] = preds

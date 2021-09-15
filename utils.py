@@ -3,7 +3,10 @@ import numpy as np
 import h5py
 import json
 import torch
-from scipy.misc import imread, imresize
+## from scipy.misc import imread, imresize
+## Deprecated functions
+from PIL import Image
+from imageio import imread
 from tqdm import tqdm
 from collections import Counter
 from random import seed, choice, sample
@@ -22,7 +25,13 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
     :param output_folder: folder to save files
     :param max_len: don't sample captions longer than this length
     """
-
+    """
+    Output
+    1. WORDMAP
+    2. CAPTIONS of training, validation, and test data
+    3. CAPLENS of training, validation, and test data
+    4. IMAGES(0~255) of training, validation, and test data
+    """
     assert dataset in {'coco', 'flickr8k', 'flickr30k'}
 
     # Read Karpathy JSON
@@ -51,7 +60,8 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
 
         path = os.path.join(image_folder, img['filepath'], img['filename']) if dataset == 'coco' else os.path.join(
             image_folder, img['filename'])
-
+        
+        ## Save paths of training, validation, and test data 
         if img['split'] in {'train', 'restval'}:
             train_image_paths.append(path)
             train_image_captions.append(captions)
@@ -68,6 +78,7 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
     assert len(test_image_paths) == len(test_image_captions)
 
     # Create word map
+    ## pad:0, start:9488, end:9489, unknown:9487, size=9490
     words = [w for w in word_freq.keys() if word_freq[w] > min_word_freq]
     word_map = {k: v + 1 for v, k in enumerate(words)}
     word_map['<unk>'] = len(word_map) + 1
@@ -75,7 +86,7 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
     word_map['<end>'] = len(word_map) + 1
     word_map['<pad>'] = 0
 
-    # Create a base/root name for all output files
+    # Create a base/root name for all output files(model checkpoint)
     base_filename = dataset + '_' + str(captions_per_image) + '_cap_per_img_' + str(min_word_freq) + '_min_word_freq'
 
     # Save word map to a JSON
@@ -90,6 +101,7 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
 
         with h5py.File(os.path.join(output_folder, split + '_IMAGES_' + base_filename + '.hdf5'), 'a') as h:
             # Make a note of the number of captions we are sampling per image
+            ## (ex. 5 captions for each image)
             h.attrs['captions_per_image'] = captions_per_image
 
             # Create dataset inside HDF5 file to store images
@@ -103,6 +115,7 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
             for i, path in enumerate(tqdm(impaths)):
 
                 # Sample captions
+                ## Sampling strategy when number of captions is less than or more than 'captions_per_image'
                 if len(imcaps[i]) < captions_per_image:
                     captions = imcaps[i] + [choice(imcaps[i]) for _ in range(captions_per_image - len(imcaps[i]))]
                 else:
@@ -116,7 +129,10 @@ def create_input_files(dataset, karpathy_json_path, image_folder, captions_per_i
                 if len(img.shape) == 2:
                     img = img[:, :, np.newaxis]
                     img = np.concatenate([img, img, img], axis=2)
-                img = imresize(img, (256, 256))
+                
+                ## 'imresize' is deprecated
+                ## img = imresize(img, (256, 256))
+                img = np.array(Image.fromarray(img).resize((256,256)))
                 img = img.transpose(2, 0, 1)
                 assert img.shape == (3, 256, 256)
                 assert np.max(img) <= 255

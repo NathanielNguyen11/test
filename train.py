@@ -11,7 +11,7 @@ from utils import *
 from nltk.translate.bleu_score import corpus_bleu
 
 # Data parameters
-data_folder = '/media/ssd/caption data'  # folder with data files saved by create_input_files.py
+data_folder = '../../dataset/COCO/output/'  # folder with data files saved by create_input_files.py
 data_name = 'coco_5_cap_per_img_5_min_word_freq'  # base name shared by data files
 
 # Model parameters
@@ -86,11 +86,13 @@ def main():
     criterion = nn.CrossEntropyLoss().to(device)
 
     # Custom dataloaders
+    ## ImageNet mean and std are used(why?)
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
     train_loader = torch.utils.data.DataLoader(
         CaptionDataset(data_folder, data_name, 'TRAIN', transform=transforms.Compose([normalize])),
         batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
+    ## 'all_captions' are included
     val_loader = torch.utils.data.DataLoader(
         CaptionDataset(data_folder, data_name, 'VAL', transform=transforms.Compose([normalize])),
         batch_size=batch_size, shuffle=True, num_workers=workers, pin_memory=True)
@@ -176,9 +178,14 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
 
         # Remove timesteps that we didn't decode at, or are pads
         # pack_padded_sequence is an easy trick to do this
-        scores, _ = pack_padded_sequence(scores, decode_lengths, batch_first=True)
-        targets, _ = pack_padded_sequence(targets, decode_lengths, batch_first=True)
-
+        
+        ### deprecated
+        ### scores, _ = pack_padded_sequence(scores, decode_lengths, batch_first=True)
+        ### targets, _ = pack_padded_sequence(targets, decode_lengths, batch_first=True)
+        scores = pack_padded_sequence(scores, decode_lengths, batch_first=True).data
+        targets = pack_padded_sequence(targets, decode_lengths, batch_first=True).data
+        ## ex. [[1,2,0], [3,0,0], [4,5,6]] -> [4, 1, 3, 5, 2, 6]
+        
         # Calculate loss
         loss = criterion(scores, targets)
 
@@ -267,8 +274,12 @@ def validate(val_loader, encoder, decoder, criterion):
             # Remove timesteps that we didn't decode at, or are pads
             # pack_padded_sequence is an easy trick to do this
             scores_copy = scores.clone()
-            scores, _ = pack_padded_sequence(scores, decode_lengths, batch_first=True)
-            targets, _ = pack_padded_sequence(targets, decode_lengths, batch_first=True)
+            
+            ### deprecated
+            ### scores, _ = pack_padded_sequence(scores, decode_lengths, batch_first=True)
+            ### targets, _ = pack_padded_sequence(targets, decode_lengths, batch_first=True)
+            scores = pack_padded_sequence(scores, decode_lengths, batch_first=True).data
+            targets = pack_padded_sequence(targets, decode_lengths, batch_first=True).data
 
             # Calculate loss
             loss = criterion(scores, targets)
@@ -311,7 +322,7 @@ def validate(val_loader, encoder, decoder, criterion):
             for j, p in enumerate(preds):
                 temp_preds.append(preds[j][:decode_lengths[j]])  # remove pads
             preds = temp_preds
-            hypotheses.extend(preds)
+            hypotheses.extend(preds) ## num_of_iter x batch x decode_lengths -> val_len x decode_lengths
 
             assert len(references) == len(hypotheses)
 
